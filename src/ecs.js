@@ -6,6 +6,7 @@ export default class World {
   #pools;
   #nextId;
   #capacity;
+  #systems;
 
   constructor(capacity = 1000000) {
     this.#nextId = 0;
@@ -13,6 +14,37 @@ export default class World {
     this.#recycledEntities = [];
     this.#pools = new Map();
     this.#capacity = capacity;
+    this.#systems = []; // {function, priority}
+  }
+  
+  registerSystem(systemCallback, priority = 0) {
+    let system = { system: systemCallback, priority: priority };
+    if (this.getSystem(systemCallback)) return false;
+    this.#systems.push(system);
+    this.#systems.sort((a, b) => b.priority - a.priority);
+    return true;
+  }
+
+  getSystem(systemCallback) {
+    return this.#systems.find((e) => e.system === systemCallback);
+  }
+
+  deregisterSystem(systemCallback) {
+    const system = this.getSystem(systemCallback);
+    if (!system) return false;
+    this.#systems.splice(this.#systems.indexOf(system), 1);
+    return true;
+  }
+
+  with(systemCallback, priority = 0) {
+    this.registerSystem(systemCallback, priority);
+    return this;
+  }
+
+  update(...args) {
+    for (const prioritizedSystem of this.#systems) {
+      prioritizedSystem.system(...args);
+    }
   }
 
   spawn() {
@@ -57,10 +89,10 @@ export default class World {
     }
     this.#pools.delete(type);
   }
-  
+
   addComponent(entity, data) {
     const type = data.constructor;
-    const pool = this.#pools.get(type);
+    let pool = this.#pools.get(type);
     if (!pool) {
       this.register(type);
       pool = this.#pools.get(type);
@@ -85,6 +117,49 @@ export default class World {
     return this.#pools.get(type)?.has(entity) ?? false;
   }
 
+  all(...types) {
+    if (types.length === 0) return [];
+    
+    if (types.length === 1) {
+      const pool = this.#pools.get(types[0]);
+      return [...pool.keys()];
+    }
+
+    // fetch requested pool types
+    const pools = types.map(type => this.#pools.get(type));
+
+    // return empty array if any are missing or empty.
+    if (pools.some(pool => !pool || pool.isEmpty())) return [];
+
+    // sort by smallest to largest
+    pools.sort((a, b) => a.size - b.size);
+
+    const [smallestPool, ...remainingPools] = pools;
+    const entities = [];
+
+    for (const entity of smallestPool.keys()) {
+      if (remainingPools.every(pool => pool.has(entity))) {
+        entities.push(entity);
+      }
+    }
+    return entities;
+  }
+
+  any(...types) {
+    if (types.length === 0) return [];
+
+    const entities = new Set();
+
+    for (const type of types) {
+      const pool = this.#pools.get(type);
+      if (!pool || pool.isEmpty()) continue;
+
+      for (const entity of pool.keys()) {
+        entities.add(entity);
+      }
+    }
+    return [...entities];
+  }
 }
 
 /**
@@ -106,4 +181,11 @@ class EntityBuilder {
 
 // query implementation
 
-// iterate all entities in one of the queried for components (usually the one with the least entities) and test for each subsequent component. 
+// iterate all entities in one of the queried for components (usually the one with the least entities) and test for each subsequent component.
+
+/**
+ * Usage:
+ * 
+ * 
+ * 
+ */
