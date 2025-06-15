@@ -78,16 +78,15 @@ export default class World {
    * @param {*} type - the component type or class (not instance!)
    */
   register(type) {
-    this.#pools.set(type, new Pool(this.#capacity, this.#capacity));
+    if (this.#pools.has(type)) return false;
+
+    this.#pools.set(type, new Pool(this.#capacity, this.#capacity - 1));
+    return true;
   }
   deregister(type) {
-    const pool = this.#pools.get(type);
-    if (pool) {
-      for (const entity of this.#entities) {
-        pool.delete(entity);
-      }
-    }
+    if (!this.#pools.has(type)) return false;
     this.#pools.delete(type);
+    return true;
   }
 
   addComponent(entity, data) {
@@ -118,7 +117,7 @@ export default class World {
   }
 
   all(...types) {
-    if (types.length === 0) return [];
+    if (this.#pools.size === 0 || types.length === 0) return [];
     
     if (types.length === 1) {
       const pool = this.#pools.get(types[0]);
@@ -129,7 +128,7 @@ export default class World {
     const pools = types.map(type => this.#pools.get(type));
 
     // return empty array if any are missing or empty.
-    if (pools.some(pool => !pool || pool.isEmpty())) return [];
+    if (this.#pools.size === 0 || pools.some(pool => !pool || pool.isEmpty())) return [];
 
     // sort by smallest to largest
     pools.sort((a, b) => a.size - b.size);
