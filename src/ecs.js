@@ -51,7 +51,7 @@ export default class World {
     if (this.#recycledEntities.length > 0) {
       const entity = this.#recycledEntities.pop();
       this.#entities.add(entity);
-      return new EntityBuilder(this, entity);
+      return new Entity(this, entity);
     }
     else if (this.#nextId >= this.#capacity) {
       throw new Error('World is full of entities.');
@@ -59,7 +59,7 @@ export default class World {
     const entity = this.#nextId;
     this.#nextId++;
     this.#entities.add(entity);
-    return new EntityBuilder(this, entity);
+    return new Entity(this, entity);
   }
 
   destroy(entity) {
@@ -90,13 +90,15 @@ export default class World {
   }
 
   addComponent(entity, data) {
+    if (!this.#entities.has(entity)) return false;
+
     const type = data.constructor;
     let pool = this.#pools.get(type);
     if (!pool) {
       this.register(type);
       pool = this.#pools.get(type);
     };
-    pool.add(entity, data);
+    return pool.add(entity, data);
   }
 
   removeComponent(entity, type) {
@@ -159,12 +161,16 @@ export default class World {
     }
     return [...entities];
   }
+
+  // query() {
+  //   return new Query(this);
+  // }
 }
 
 /**
  * Wrapper for entity IDs with ergonomic methods
  */
-class EntityBuilder {
+class Entity {
   #world
   #id
   constructor(world, id) {
@@ -176,7 +182,38 @@ class EntityBuilder {
     this.#world.addComponent(this.#id, component);
     return this;
   }
+
+  add(component) {
+    return this.#world.addComponent(this.#id, component);
+  }
+
+  get(type) {
+    return this.#world.getComponent(this.#id, type);
+  }
+
+  has(type) {
+    return this.#world.hasComponent(this.#id, type);
+  }
+
+  remove(type) {
+    return this.#world.removeComponent(this.#id, type);
+  }
+
+  get id() {
+    return this.#id;
+  }
 }
+
+// class Query {
+//   #world
+//   #all
+//   constructor(world) {
+//     this.#world = world;
+//   }
+//   *[Symbol.iterator]() {
+
+//   }
+// }
 
 // query implementation
 

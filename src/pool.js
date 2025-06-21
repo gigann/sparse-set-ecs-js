@@ -66,23 +66,30 @@ export default class Pool {
   }
 
   /**
-   * Appends an Entity-Component pair to the Pool.
+   * Appends an Entity-Component pair to the Pool, or sets it if it already exists.
    * @param {number} entity 
    * @param {*} component
+   * @returns Returns true if successfully added or set, or false if the Pool is full.
    */
   add(entity, component) {
     this.#assert(entity);
 
-    if (this.#size >= this.#capacity) throw new RangeError('Pool is full');
+    if (this.#size >= this.#capacity) return false;
 
     const i = this.#sparse[entity];
-    if (i < this.#size && this.#entities[i] === entity)
-      throw new Error('Entity ID is not unique');
 
+    // setting the component the entity already has
+    if (i < this.#size && this.#entities[i] === entity) {
+      this.#components[i] = component;
+      return true;
+    }
+
+    // adding the component for the first time
     this.#entities[this.#size] = entity;
     this.#components[this.#size] = component;
     this.#sparse[entity] = this.#size;
     this.#size++;
+    return true;
   }
 
   /**
@@ -152,22 +159,6 @@ export default class Pool {
       return this.#components[i];
     }
     return undefined;
-  }
-
-  /**
-   * Modifies the component of an entity in the cool.
-   * @param {number} entity 
-   * @param {*} component
-   * @returns Returns true if an Entity in the Pool existed and has been modified, or false if the Entity does not exist.
-   */
-  set(entity, component) {
-    this.#assert(entity);
-
-    if (!this.has(entity)) return false;
-
-    const i = this.#sparse[entity];
-    this.#components[i] = component;
-    return true;
   }
 
   *keys() {
