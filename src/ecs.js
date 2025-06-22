@@ -282,8 +282,10 @@ class Entity {
     this.#id = id;
   }
 
-  with(component) {
-    this.#world.addComponent(this.#id, component);
+  with(...components) {
+    for (const component of components){
+      this.#world.addComponent(this.#id, component);
+    }
     return this;
   }
 
