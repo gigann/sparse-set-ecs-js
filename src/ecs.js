@@ -1,19 +1,25 @@
 import Pool from './pool';
 
+/**
+ * A World instance manages entities, components, and systems.
+ * (Lowercase) entities are numeric IDs assigned by the World instance
+ */
 export default class World {
   #entities;
   #recycledEntities;
   #pools;
   #nextId;
   #capacity;
+  #maxEntity;
   #systems;
 
-  constructor(capacity = 1000000) {
+  constructor(capacity) {
     this.#nextId = 0;
     this.#entities = new Set();
     this.#recycledEntities = [];
     this.#pools = new Map();
     this.#capacity = capacity;
+    this.#maxEntity = capacity - 1;
     this.#systems = []; // {function, priority}
   }
   
@@ -80,7 +86,7 @@ export default class World {
   register(type) {
     if (this.#pools.has(type)) return false;
 
-    this.#pools.set(type, new Pool(this.#capacity, this.#capacity - 1));
+    this.#pools.set(type, new Pool(this.#capacity, this.#maxEntity));
     return true;
   }
   deregister(type) {

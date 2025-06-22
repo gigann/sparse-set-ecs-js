@@ -2,10 +2,14 @@
   "name": "sparse-set-ecs",
   "version": "0.0.1",
   "description": "An entity-component system built in JS using sparse-set architecture for adding, removing, and looking up components with O(1) time complexity. Iteration is O(n).",
-  "main": "index.js",
+  "main": "./index.js",
   "type": "module",
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "tbd"
   },
   "keywords": [
     "ecs",
@@ -15,5 +19,17 @@
   "license": "ISC",
   "devDependencies": {
     "jest": "^30.0.0"
-  }
+  },
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "LICENSE",
+    "README.md"
+  ]
 }
