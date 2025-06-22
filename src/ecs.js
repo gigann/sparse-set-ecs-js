@@ -3,6 +3,8 @@ import Pool from './pool';
 /**
  * A World instance manages entities, components, and systems.
  * (Lowercase) entities are numeric IDs assigned by the World instance
+ * Components are plain data wrapped in a named class for pooling.
+ * Systems are (optionally) ordered functions iterated over entities of select components.
  */
 export default class World {
   #entities;
