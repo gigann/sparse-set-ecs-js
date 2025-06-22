@@ -22,23 +22,85 @@ export default class World {
     this.#pools = new Map();
     this.#capacity = capacity;
     this.#maxEntity = capacity - 1;
-    this.#systems = []; // {function, priority}
+    this.#systems = []; // {name, priority, func}
+  }
+
+  get state() {
+    // Convert Map of Pool objects to plain arrays:
+    // [typeName, [[entity, component], ...], ...]
+    const pools = [];
+    for (const [typeName, pool] of this.#pools.entries()){
+      const poolData = [];
+      for (const entity of pool.keys()){
+        poolData.push([entity, pool.get(entity)]);
+      }
+      pools.push([typeName, poolData]);
+    }
+
+    return {
+      nextId: this.#nextId,
+      entities: Array.from(this.#entities),
+      recycledEntities: this.#recycledEntities,
+      pools,
+      capacity: this.#capacity,
+      maxEntity: this.#maxEntity,
+      // systems: this.#systems.map(s => ({
+      //   name: s.name, priority: s.priority
+      // })) // cannot store func, must rebuild
+    }
+  }
+
+  serialize() {
+    // Convert state to JSON
+    const json = JSON.stringify(this.state);
+    // Encode JSON to binary
+    const data = new TextEncoder().encode(json);
+    return new Blob([data], { type: 'application/octet-stream' });
+  }
+
+  static async deserialize(blob) {
+    // Read binary from blob
+    const data = new Uint16Array(await blob.arrayBuffer());
+    // Decode binary to JSON
+    const json = new TextDecoder().decode(data);
+    // Parse JSON to object
+    const state = JSON.parse(json);
+    // Reconstruct the World instance
+    const world = new World(state.capacity);
+    world.#nextId = state.nextId;
+    world.#entities = new Set(state.entities);
+    world.#recycledEntities = state.recycledEntities;
+
+    // Restore components
+    for (const [typeName, poolData] of state.pools){
+      world.registerComponent(typeName);
+      const pool = world.#pools.get(typeName);
+      for (const [entity, component] of poolData){
+        pool.add(entity, component);
+      }
+    }
+
+    return world;
   }
   
   registerSystem(systemCallback, priority = 0) {
-    let system = { system: systemCallback, priority: priority };
-    if (this.getSystem(systemCallback)) return false;
+    const name = systemCallback.name;
+
+    let system = { name: name, system: systemCallback, priority: priority };
+    if (this.getSystem(name)) return false;
     this.#systems.push(system);
+    this.#systems.sort((a, b) => a.name - b.name);
     this.#systems.sort((a, b) => b.priority - a.priority);
     return true;
   }
 
-  getSystem(systemCallback) {
-    return this.#systems.find((e) => e.system === systemCallback);
+  getSystem(system) {
+    const name = typeof system === 'function' ? system.name : system;
+    return this.#systems.find((s) => s.name === name);
   }
 
-  deregisterSystem(systemCallback) {
-    const system = this.getSystem(systemCallback);
+  deregisterSystem(name) {
+    const system = this.getSystem(name);
     if (!system) return false;
     this.#systems.splice(this.#systems.indexOf(system), 1);
     return true;
@@ -81,61 +143,92 @@ export default class World {
     return true;
   }
 
-  /**
-   * 
-   * @param {*} type - the component type or class (not instance!)
-   */
-  register(type) {
-    if (this.#pools.has(type)) return false;
+  #validateComponent(type) {
+    if (type == null) throw new TypeError(`Component "${type}" cannot be null or undefined.`);
+    switch (typeof type) {
+      case 'string':
+        return type;
+      case 'function':
+        return type.name;
+      case 'object':
+        if (type.type) {
+          return type.type;
+        }
+        else {
+          throw new TypeError(`Component "${type}" is missing a "type" property.`);
+        }
+      default:
+        throw new TypeError('Invalid component type. Specify component type with a Class, object, or string');
+    }
+  }
 
-    this.#pools.set(type, new Pool(this.#capacity, this.#maxEntity));
+  registerComponent(type) {
+    const typeName = this.#validateComponent(type);
+    if (this.#pools.has(typeName)) return false;
+    this.#pools.set(typeName, new Pool(this.#capacity, this.#maxEntity));
     return true;
   }
-  deregister(type) {
-    if (!this.#pools.has(type)) return false;
-    this.#pools.delete(type);
+  deregisterComponent(type) {
+    const typeName = this.#validateComponent(type);
+    if (!this.#pools.has(typeName)) return false;
+    this.#pools.delete(typeName);
     return true;
   }
 
-  addComponent(entity, data) {
+  addComponent(entity, component) {
     if (!this.#entities.has(entity)) return false;
+    let typeName;
+    let data = component;
 
-    const type = data.constructor;
-    let pool = this.#pools.get(type);
+    // Convert class instances to plain object data with a 'type' property
+    if (typeof component === 'object' && component.constructor !== Object) {
+      typeName = component.constructor.name;
+      data = { type: typeName, ...component };
+    } else {
+      typeName = component.type;
+    }
+
+    // Verify plain object data has a 'type' property
+    if (!data.type) {
+      throw new TypeError(`Component "${component}" is missing a "type" property.`);
+    }
+
+    let pool = this.#pools.get(typeName);
     if (!pool) {
-      this.register(type);
-      pool = this.#pools.get(type);
+      this.registerComponent(typeName);
+      pool = this.#pools.get(typeName);
     };
     return pool.add(entity, data);
   }
 
   removeComponent(entity, type) {
     if (!this.#entities.has(entity)) return false;
-
-    const pool = this.#pools.get(type);
+    const typeName = this.#validateComponent(type);
+    const pool = this.#pools.get(typeName);
     if (!pool) return false;
-
     return pool.delete(entity);
   }
 
   getComponent(entity, type) {
-    return this.#pools?.get(type)?.get(entity);
+    const typeName = this.#validateComponent(type);
+    return this.#pools?.get(typeName)?.get(entity);
   }
 
   hasComponent(entity, type) {
-    return this.#pools.get(type)?.has(entity) ?? false;
+    const typeName = this.#validateComponent(type);
+    return this.#pools.get(typeName)?.has(entity) ?? false;
   }
 
   all(...types) {
     if (this.#pools.size === 0 || types.length === 0) return [];
-    
-    if (types.length === 1) {
-      const pool = this.#pools.get(types[0]);
+    const typeNames = types.map(type => this.#validateComponent(type));
+    if (typeNames.length === 1) {
+      const pool = this.#pools.get(typeNames[0]);
       return [...pool.keys()];
     }
 
     // fetch requested pool types
-    const pools = types.map(type => this.#pools.get(type));
+    const pools = typeNames.map(type => this.#pools.get(type));
 
     // return empty array if any are missing or empty.
     if (this.#pools.size === 0 || pools.some(pool => !pool || pool.isEmpty())) return [];
@@ -156,10 +249,11 @@ export default class World {
 
   any(...types) {
     if (types.length === 0) return [];
+    const typeNames = types.map(type => this.#validateComponent(type));
 
     const entities = new Set();
 
-    for (const type of types) {
+    for (const type of typeNames) {
       const pool = this.#pools.get(type);
       if (!pool || pool.isEmpty()) continue;
 
@@ -173,6 +267,8 @@ export default class World {
   // query() {
   //   return new Query(this);
   // }
+
+
 }
 
 /**
@@ -211,6 +307,20 @@ class Entity {
     return this.#id;
   }
 }
+
+// /**
+//  * Abstract component class. Component classes must extend this class.
+//  */
+// export class AComponent {
+//   constructor() {
+//     const prototype = Object.getPrototypeOf(this);
+//     const methods = Object.getOwnPropertyNames(prototype).filter(name => name !=='constructor' && typeof prototype[name] === 'function');
+//     if (methods.length > 0) {
+//       throw new TypeError(`Component classes cannot contain any methods other than the constructor. Your component class currently contains [${methods.join(', ')}]`);
+//     }
+
+//   }
+// }
 
 // class Query {
 //   #world
