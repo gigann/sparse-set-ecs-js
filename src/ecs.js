@@ -1,4 +1,4 @@
-import Pool from './pool';
+import Pool from './pool.js';
 
 /**
  * A World instance manages entities, components, and systems.

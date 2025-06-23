@@ -24,7 +24,7 @@ npm i github:gigann/sparse-set-ecs-js
 ### Starter
 
 ```js
-import World from './sparse-set-ecs-js';
+import World from './sparse-set-ecs';
 
 // Create a new world for your entities to live in.
 const world = new World(1000);
