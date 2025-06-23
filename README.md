@@ -13,7 +13,7 @@ An entity-component system built in JS using sparse-set architecture.
 
 >*Deserialization of components uses objects keyed by type rather than Classes, but is compatible with previously defined Classes as they have the same properties.
 
-## Installation
+## Installation (TBD)
 
 ```js
 npm i github:gigann/sparse-set-ecs-js
