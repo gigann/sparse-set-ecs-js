@@ -27,8 +27,7 @@
     }
   },
   "files": [
-    "index.js",
-    "index.d.ts",
+    "bundle.js",
     "LICENSE",
     "README.md"
   ]
