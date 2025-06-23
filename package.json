@@ -22,8 +22,7 @@
   },
   "exports": {
     ".": {
-      "import": "./index.js",
-      "types": "./index.d.ts"
+      "import": "./bundle.js"
     }
   },
   "files": [
